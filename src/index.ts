@@ -1,58 +1,125 @@
 import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
+import { getProducts, addProduct, updateProduct } from './api/products';
+import { getUsers, addUser, deleteUser } from './api/users';
 
-// A schema is a collection of type definitions (hence "typeDefs")
-// that together define the "shape" of queries that are executed against
-// your data.
 const typeDefs = `#graphql
-  # Comments in GraphQL strings (such as this one) start with the hash (#) symbol.
-
-  # This "Book" type defines the queryable fields for every book in our data source.
-  type Book {
-    title: String
-    author: String
+  type Rating {
+	rate: Float!
+	count: Int!
   }
 
-  # The "Query" type is special: it lists all of the available queries that
-  # clients can execute, along with the return type for each. In this
-  # case, the "books" query returns an array of zero or more Books (defined above).
+  type Product {
+	id: Int!
+	title: String!
+	price: Float!
+	description: String
+	category: String
+	image: String
+	rating: Rating
+  }
+
+  type Name {
+	firstname: String!
+	lastname: String!
+  }
+
+  type Geolocation {
+	lat: String!
+	long: String!
+  }
+
+  type Address {
+	city: String!
+	street: String!
+	number: Int!
+	zipcode: String!
+  }
+
+  type User {
+	id: Int!
+	email: String!
+	username: String!
+	password: String!
+	name: Name
+	phone: String
+	address: Address
+	geolocation: Geolocation
+  }
+
   type Query {
-    books: [Book]
+	products: [Product]
+	findProduct(id: Int!): Product
+	findProductsByCategory(category: String!): [Product]
+	users: [User]
+	findUser(email: String!): User
+  }
+
+  type Mutation {
+	addProduct(title: String!, price: Float!, description: String, category: String, image: String): Product
+	updateProduct(id: Int!, title: String, price: Float, description: String, category: String, image: String): Product
+	addUser(email: String!, username: String!, password: String!): User
+	deleteUser(id: Int!): User
   }
 `;
 
-const books = [
-	{
-		title: 'The Awakening',
-		author: 'Kate Chopin'
-	},
-	{
-		title: 'City of Glass',
-		author: 'Paul Auster'
-	}
-];
-
-// Resolvers define how to fetch the types defined in your schema.
-// This resolver retrieves books from the "books" array above.
 const resolvers = {
 	Query: {
-		books: () => books
+		products: async () => {
+			return await getProducts();
+		},
+		findProduct: async (root: any, args: { id: number }) => {
+			const { id } = args;
+			const products = await getProducts();
+			return products.find((product: { id: number }) => product.id === id);
+		},
+		findProductsByCategory: async (root: any, args: { category: string }) => {
+			const { category } = args;
+			const products = await getProducts();
+			return products.filter((product: { category: string }) => product.category === category);
+		},
+		users: async () => {
+			return await getUsers();
+		},
+		findUser: async (root: any, args: { email: string }) => {
+			const { email } = args;
+			const users = await getUsers();
+			return users.find((user: { email: string }) => user.email === email);
+		}
+	},
+	Mutation: {
+		addProduct: async (
+			root: any,
+			args: { title: string; price: number; description: string; category: string; image: string }
+		) => {
+			const { title, price, description, category, image } = args;
+			return await addProduct({ title, price, description, category, image });
+		},
+		updateProduct: async (
+			root: any,
+			args: { id: number; title: string; price: number; description: string; category: string; image: string }
+		) => {
+			const { id, title, price, description, category, image } = args;
+			return await updateProduct(id, { title, price, description, category, image });
+		},
+		addUser: async (root: any, args: { email: string; username: string; password: string }) => {
+			const { email, username, password } = args;
+			return await addUser({ email, username, password });
+		},
+		deleteUser: async (root: any, args: { id: number }) => {
+			const { id } = args;
+			return await deleteUser(id);
+		}
 	}
 };
 
-// The ApolloServer constructor requires two parameters: your schema
-// definition and your set of resolvers.
 const server = new ApolloServer({
 	typeDefs,
 	resolvers
 });
 
-// Passing an ApolloServer instance to the `startStandaloneServer` function:
-//  1. creates an Express app
-//  2. installs your ApolloServer instance as middleware
-//  3. prepares your app to handle incoming requests
-const { url } = await startStandaloneServer(server, {
+startStandaloneServer(server, {
 	listen: { port: 4000 }
+}).then(({ url }) => {
+	console.log(`🚀  Server ready at: ${url}`);
 });
-
-console.log(`🚀  Server ready at: ${url}`);
